@@ -120,6 +120,17 @@ struct ControlPanelView: View {
         Divider()
 
         // Capture
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(isOn: $control.showTouches) {
+                Label("Show Touches", systemImage: "hand.tap")
+            }
+            .toggleStyle(.switch)
+            .controlSize(.small)
+            .onChange(of: control.showTouches) { _, _ in
+                control.applyShowTouches()
+            }
+        }
+
         HStack(spacing: 12) {
             Button {
                 control.takeScreenshot()

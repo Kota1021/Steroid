@@ -111,8 +111,16 @@ class SimulatorControl {
 
     // MARK: - Capture
 
+    var showTouches = false
     var isRecording = false
+    var simulatorWindowID: UInt32 = 0
     @ObservationIgnored private var recordingProcess: Process?
+
+    func applyShowTouches() {
+        simctl(["spawn", deviceId, "defaults", "write",
+                "com.apple.preferences.touch", "ShowSingleTouches",
+                "-bool", showTouches ? "YES" : "NO"])
+    }
 
     private func captureFileName(ext: String) -> String {
         let device = selectedDevice
@@ -144,18 +152,37 @@ class SimulatorControl {
 
     private func startRecording() {
         let id = deviceId
+        let windowID = simulatorWindowID
         isRecording = true
-        let filename = captureFileName(ext: "mp4")
-        let desktop = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first!
-        let path = desktop.appendingPathComponent(filename).path
-        Task.detached { @MainActor [weak self] in
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
-            process.arguments = ["simctl", "io", id, "recordVideo", "--codec=h264", "--force", path]
-            process.standardOutput = FileHandle.nullDevice
-            process.standardError = FileHandle.nullDevice
-            try? process.run()
-            self?.recordingProcess = process
+
+        if showTouches, windowID != 0 {
+            // Window capture via screencapture — includes touch overlay
+            let filename = captureFileName(ext: "mov")
+            let desktop = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first!
+            let path = desktop.appendingPathComponent(filename).path
+            Task.detached { @MainActor [weak self] in
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+                process.arguments = ["-v", "-o", "-l", String(windowID), path]
+                process.standardOutput = FileHandle.nullDevice
+                process.standardError = FileHandle.nullDevice
+                try? process.run()
+                self?.recordingProcess = process
+            }
+        } else {
+            // Device framebuffer capture via simctl
+            let filename = captureFileName(ext: "mp4")
+            let desktop = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first!
+            let path = desktop.appendingPathComponent(filename).path
+            Task.detached { @MainActor [weak self] in
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+                process.arguments = ["simctl", "io", id, "recordVideo", "--codec=h264", "--force", path]
+                process.standardOutput = FileHandle.nullDevice
+                process.standardError = FileHandle.nullDevice
+                try? process.run()
+                self?.recordingProcess = process
+            }
         }
     }
 
@@ -205,6 +232,7 @@ class SimulatorControl {
         buttonShapes = state.buttonShapes
         grayscale = state.grayscale
         differentiateWithoutColor = state.differentiateWithoutColor
+        showTouches = state.showTouches
     }
 
     // MARK: - Fetch (nonisolated)
@@ -220,15 +248,20 @@ class SimulatorControl {
         let buttonShapes: Bool
         let grayscale: Bool
         let differentiateWithoutColor: Bool
+        let showTouches: Bool
     }
 
     nonisolated private static func fetchCurrentState(deviceId: String) -> State {
-        // Launch all 4 processes concurrently
+        // Launch all 5 processes concurrently
         let (appProc, appPipe) = startSimctl(["ui", deviceId, "appearance"])
         let (csProc, csPipe) = startSimctl(["ui", deviceId, "content_size"])
         let (conProc, conPipe) = startSimctl(["ui", deviceId, "increase_contrast"])
         let (accProc, accPipe) = startSimctl([
             "spawn", deviceId, "defaults", "read", "com.apple.Accessibility",
+        ])
+        let (touchProc, touchPipe) = startSimctl([
+            "spawn", deviceId, "defaults", "read",
+            "com.apple.preferences.touch", "ShowSingleTouches",
         ])
 
         // Wait for all to finish
@@ -236,11 +269,13 @@ class SimulatorControl {
         csProc.waitUntilExit()
         conProc.waitUntilExit()
         accProc.waitUntilExit()
+        touchProc.waitUntilExit()
 
         let appearance = readPipe(appPipe)
         let contentSize = readPipe(csPipe)
         let contrast = readPipe(conPipe)
         let acc = parseAccessibilityDefaults(readPipe(accPipe))
+        let touchValue = readPipe(touchPipe)
 
         let contentSizeIdx: Double
         if let idx = contentSizes.firstIndex(where: { $0.value == contentSize }) {
@@ -259,7 +294,8 @@ class SimulatorControl {
             onOffLabels: acc["OnOffLabelsEnabled"] ?? false,
             buttonShapes: acc["ButtonShapesEnabled"] ?? false,
             grayscale: acc["GrayscaleEnabled"] ?? false,
-            differentiateWithoutColor: acc["DifferentiateWithoutColor"] ?? false
+            differentiateWithoutColor: acc["DifferentiateWithoutColor"] ?? false,
+            showTouches: touchValue == "1"
         )
     }
 

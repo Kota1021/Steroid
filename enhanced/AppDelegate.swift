@@ -81,7 +81,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 frame: windowTracker.simulatorFrame,
                 focused: windowTracker.isSimulatorFocused,
                 windowCount: windowTracker.simulatorWindowCount,
-                windowTitle: windowTracker.activeWindowTitle
+                windowTitle: windowTracker.activeWindowTitle,
+                windowID: windowTracker.simulatorWindowID
             )
         } onChange: { [weak self] in
             DispatchQueue.main.async {
@@ -90,7 +91,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func handleTrackerUpdate(frame: CGRect?, focused: Bool, windowCount: Int, windowTitle: String?) {
+    private func handleTrackerUpdate(frame: CGRect?, focused: Bool, windowCount: Int, windowTitle: String?, windowID: UInt32) {
         guard let frame else {
             panel.orderOut(nil)
             lastSimulatorFrame = nil
@@ -110,6 +111,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 simulatorControl.refreshDevices()
             }
         }
+
+        simulatorControl.simulatorWindowID = windowID
 
         // Auto-select device based on focused Simulator window
         if let title = windowTitle {

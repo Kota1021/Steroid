@@ -5,6 +5,7 @@ import Observation
 @Observable
 class WindowTracker {
     var simulatorFrame: CGRect?
+    var simulatorWindowID: UInt32 = 0
     var isSimulatorFocused = false
     var simulatorWindowCount = 0
     var activeWindowTitle: String?
@@ -82,6 +83,10 @@ class WindowTracker {
             count += 1
             if frontmostFrame == nil {
                 frontmostFrame = rect
+                if let wid = window[kCGWindowNumber as String] as? Int {
+                    let newID = UInt32(wid)
+                    if simulatorWindowID != newID { simulatorWindowID = newID }
+                }
             }
         }
 
