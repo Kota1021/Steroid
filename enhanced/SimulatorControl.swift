@@ -80,6 +80,81 @@ class SimulatorControl {
         setAccessibilityPref("DifferentiateWithoutColor", enabled: differentiateWithoutColor)
     }
 
+    // MARK: - Sync
+
+    private struct State: Sendable {
+        let isDarkMode: Bool
+        let contentSizeIndex: Double
+        let invertColors: Bool
+        let increaseContrast: Bool
+        let reduceTransparency: Bool
+        let reduceMotion: Bool
+        let onOffLabels: Bool
+        let buttonShapes: Bool
+        let grayscale: Bool
+        let differentiateWithoutColor: Bool
+    }
+
+    func syncWithSimulator() {
+        Task {
+            let state = await Task.detached { Self.fetchCurrentState() }.value
+            isDarkMode = state.isDarkMode
+            contentSizeIndex = state.contentSizeIndex
+            invertColors = state.invertColors
+            increaseContrast = state.increaseContrast
+            reduceTransparency = state.reduceTransparency
+            reduceMotion = state.reduceMotion
+            onOffLabels = state.onOffLabels
+            buttonShapes = state.buttonShapes
+            grayscale = state.grayscale
+            differentiateWithoutColor = state.differentiateWithoutColor
+        }
+    }
+
+    nonisolated private static func fetchCurrentState() -> State {
+        let appearance = readSimctl(["ui", "booted", "appearance"])
+        let contentSize = readSimctl(["ui", "booted", "content_size"])
+        let contrast = readSimctl(["ui", "booted", "increase_contrast"])
+
+        let contentSizeIdx: Double
+        if let idx = contentSizes.firstIndex(where: { $0.value == contentSize }) {
+            contentSizeIdx = Double(idx)
+        } else {
+            contentSizeIdx = 3 // default "large"
+        }
+
+        return State(
+            isDarkMode: appearance == "dark",
+            contentSizeIndex: contentSizeIdx,
+            invertColors: readAccessibilityBool("InvertColorsEnabled"),
+            increaseContrast: contrast == "enabled",
+            reduceTransparency: readAccessibilityBool("EnhancedBackgroundContrastEnabled"),
+            reduceMotion: readAccessibilityBool("ReduceMotionEnabled"),
+            onOffLabels: readAccessibilityBool("OnOffLabelsEnabled"),
+            buttonShapes: readAccessibilityBool("ButtonShapesEnabled"),
+            grayscale: readAccessibilityBool("GrayscaleEnabled"),
+            differentiateWithoutColor: readAccessibilityBool("DifferentiateWithoutColor")
+        )
+    }
+
+    nonisolated private static func readSimctl(_ arguments: [String]) -> String {
+        let process = Process()
+        let pipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+        process.arguments = ["simctl"] + arguments
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        try? process.run()
+        process.waitUntilExit()
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        return String(data: data, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
+
+    nonisolated private static func readAccessibilityBool(_ key: String) -> Bool {
+        readSimctl(["spawn", "booted", "defaults", "read", "com.apple.Accessibility", key]) == "1"
+    }
+
     // MARK: - Private
 
     private func setAccessibilityPref(_ key: String, enabled: Bool) {

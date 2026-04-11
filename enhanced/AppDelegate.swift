@@ -9,6 +9,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let simulatorControl = SimulatorControl()
     private var isPanelVisible = true
     private var lastSimulatorFrame: CGRect?
+    private var hasSynced = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupStatusBar()
@@ -90,7 +91,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard let frame else {
             panel.orderOut(nil)
             lastSimulatorFrame = nil
+            hasSynced = false
             return
+        }
+
+        if !hasSynced {
+            hasSynced = true
+            simulatorControl.syncWithSimulator()
         }
 
         if frame != lastSimulatorFrame {
