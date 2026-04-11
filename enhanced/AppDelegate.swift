@@ -71,6 +71,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Tracking
 
     private func setupTracking() {
+        // Direct callback: AX observer → panel position, zero async hops
+        windowTracker.onFrameChanged = { [weak self] frame in
+            guard let self, self.isPanelVisible else { return }
+            self.lastSimulatorFrame = frame
+            self.positionPanel(relativeTo: frame)
+        }
         windowTracker.startTracking()
         observeChanges()
     }

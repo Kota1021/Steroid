@@ -10,17 +10,31 @@ class WindowTracker {
     var simulatorWindowCount = 0
     var activeWindowTitle: String?
 
-    @ObservationIgnored private var timer: Timer?
+    @ObservationIgnored private var positionTimer: Timer?
+    @ObservationIgnored private var stateTimer: Timer?
     @ObservationIgnored private var activationObserver: Any?
+    @ObservationIgnored private var trackedPID: pid_t = 0
+
+    /// Direct callback — bypasses @Observable for zero-latency panel repositioning
+    @ObservationIgnored var onFrameChanged: ((CGRect) -> Void)?
 
     var isSimulatorRunning: Bool {
         simulatorFrame != nil
     }
 
     func startTracking() {
-        updateSimulatorFrame()
-        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            self?.updateSimulatorFrame()
+        updateSimulatorState()
+
+        // 60fps: lightweight single-window position tracking
+        let fast = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
+            self?.updateWindowPosition()
+        }
+        RunLoop.main.add(fast, forMode: .common)
+        positionTimer = fast
+
+        // 2s: full state (window count, title, device detection)
+        stateTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            self?.updateSimulatorState()
         }
 
         activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
@@ -29,20 +43,49 @@ class WindowTracker {
             queue: .main
         ) { [weak self] notification in
             guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
-            self?.isSimulatorFocused = app.bundleIdentifier == "com.apple.iphonesimulator"
+            let isSimulator = app.bundleIdentifier == "com.apple.iphonesimulator"
+            self?.isSimulatorFocused = isSimulator
+            if isSimulator {
+                self?.updateSimulatorState()
+            }
         }
     }
 
     func stopTracking() {
-        timer?.invalidate()
-        timer = nil
+        positionTimer?.invalidate()
+        positionTimer = nil
+        stateTimer?.invalidate()
+        stateTimer = nil
         if let observer = activationObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(observer)
             activationObserver = nil
         }
     }
 
-    private func updateSimulatorFrame() {
+    // MARK: - Fast path (60fps) — single window position only
+
+    private func updateWindowPosition() {
+        guard simulatorWindowID != 0 else { return }
+
+        // Query only the tracked window (not the entire window list)
+        guard let infos = CGWindowListCopyWindowInfo(
+            [.optionIncludingWindow],
+            CGWindowID(simulatorWindowID)
+        ) as? [[String: Any]],
+              let window = infos.first,
+              let boundsDict = window[kCGWindowBounds as String],
+              let rect = CGRect(dictionaryRepresentation: boundsDict as! CFDictionary)
+        else { return }
+
+        onFrameChanged?(rect)
+        if simulatorFrame != rect {
+            simulatorFrame = rect
+        }
+    }
+
+    // MARK: - Slow path (2s) — full state discovery
+
+    private func updateSimulatorState() {
         let simulatorApps = NSWorkspace.shared.runningApplications.filter {
             $0.bundleIdentifier == "com.apple.iphonesimulator"
         }
@@ -51,10 +94,13 @@ class WindowTracker {
             if simulatorFrame != nil { simulatorFrame = nil }
             if simulatorWindowCount != 0 { simulatorWindowCount = 0 }
             if activeWindowTitle != nil { activeWindowTitle = nil }
+            simulatorWindowID = 0
+            trackedPID = 0
             return
         }
 
         let pid = simulatorApp.processIdentifier
+        trackedPID = pid
 
         guard let windowList = CGWindowListCopyWindowInfo(
             [.optionOnScreenOnly, .excludeDesktopElements],
@@ -64,6 +110,7 @@ class WindowTracker {
         }
 
         var frontmostFrame: CGRect?
+        var frontmostWID: UInt32 = 0
         var count = 0
 
         for window in windowList {
@@ -84,12 +131,14 @@ class WindowTracker {
             if frontmostFrame == nil {
                 frontmostFrame = rect
                 if let wid = window[kCGWindowNumber as String] as? Int {
-                    let newID = UInt32(wid)
-                    if simulatorWindowID != newID { simulatorWindowID = newID }
+                    frontmostWID = UInt32(wid)
                 }
             }
         }
 
+        if simulatorWindowID != frontmostWID {
+            simulatorWindowID = frontmostWID
+        }
         if simulatorFrame != frontmostFrame {
             simulatorFrame = frontmostFrame
         }
@@ -97,7 +146,6 @@ class WindowTracker {
             simulatorWindowCount = count
         }
 
-        // Get focused Simulator window title via Accessibility API
         let title = focusedWindowTitle(pid: pid)
         if activeWindowTitle != title {
             activeWindowTitle = title
