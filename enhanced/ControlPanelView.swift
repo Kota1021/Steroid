@@ -162,10 +162,10 @@ struct ControlPanelView: View {
             HStack {
                 Text("Time")
                     .font(.caption).foregroundStyle(.secondary)
-                TextField("9:41", text: $control.statusBarTime)
-                    .textFieldStyle(.roundedBorder)
+                DatePicker("", selection: $control.statusBarTime, displayedComponents: .hourAndMinute)
+                    .labelsHidden()
                     .controlSize(.small)
-                    .onSubmit { control.applyStatusBar() }
+                    .onChange(of: control.statusBarTime) { _, _ in control.applyStatusBar() }
             }
             HStack {
                 Text("Network")

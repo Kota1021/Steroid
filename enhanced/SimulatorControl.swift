@@ -194,7 +194,11 @@ class SimulatorControl {
 
     // MARK: - Status Bar
 
-    var statusBarTime = "9:41"
+    var statusBarTime: Date = {
+        var c = DateComponents()
+        c.hour = 9; c.minute = 41
+        return Calendar.current.date(from: c) ?? .now
+    }()
     var statusBarNetwork = "wifi"
     var statusBarWiFiBars = 3
     var statusBarCellularBars = 4
@@ -207,7 +211,9 @@ class SimulatorControl {
 
     func applyStatusBar() {
         var args = ["status_bar", deviceId, "override"]
-        args += ["--time", statusBarTime.isEmpty ? "9:41" : statusBarTime]
+        let tf = DateFormatter()
+        tf.dateFormat = "h:mm"
+        args += ["--time", tf.string(from: statusBarTime)]
         args += ["--dataNetwork", statusBarNetwork]
         args += ["--wifiBars", String(statusBarWiFiBars)]
         args += ["--cellularBars", String(statusBarCellularBars)]
