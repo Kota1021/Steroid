@@ -4,16 +4,6 @@ struct ControlPanelView: View {
     @Bindable var control: SimulatorControl
     var windowTracker: WindowTracker
 
-    // Section expansion state
-    @State private var showAppearance = true
-    @State private var showDynamicType = true
-    @State private var showAccessibility = true
-    @State private var showCapture = true
-    @State private var showStatusBar = false
-    @State private var showLocation = false
-    @State private var showPush = false
-    @State private var showPrivacy = false
-    @State private var showOpenURL = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -59,7 +49,7 @@ struct ControlPanelView: View {
 
     @ViewBuilder
     private var connectedContent: some View {
-        section("Appearance", systemImage: "circle.lefthalf.filled", isExpanded: $showAppearance) {
+        section("Appearance", systemImage: "circle.lefthalf.filled") {
             Picker("", selection: $control.isDarkMode) {
                 Label("Light", systemImage: "sun.max").tag(false)
                 Label("Dark", systemImage: "moon").tag(true)
@@ -68,7 +58,7 @@ struct ControlPanelView: View {
             .onChange(of: control.isDarkMode) { _, _ in control.applyAppearance() }
         }
 
-        section("Dynamic Type", systemImage: "textformat.size", isExpanded: $showDynamicType) {
+        section("Dynamic Type", systemImage: "textformat.size") {
             HStack {
                 Spacer()
                 Text(control.currentSizeLabel)
@@ -90,7 +80,7 @@ struct ControlPanelView: View {
             }
         }
 
-        section("Accessibility", systemImage: "accessibility", isExpanded: $showAccessibility) {
+        section("Accessibility", systemImage: "accessibility") {
             accessibilityToggle("Invert Colors", systemImage: "circle.righthalf.filled",
                                 isOn: $control.invertColors) { control.applyInvertColors() }
             accessibilityToggle("Increase Contrast", systemImage: "circle.circle",
@@ -109,7 +99,7 @@ struct ControlPanelView: View {
                                 isOn: $control.differentiateWithoutColor) { control.applyDifferentiateWithoutColor() }
         }
 
-        section("Capture", systemImage: "camera", isExpanded: $showCapture) {
+        section("Capture", systemImage: "camera") {
             Toggle(isOn: $control.showTouches) {
                 Label("Show Touches", systemImage: "hand.tap")
             }
@@ -134,23 +124,23 @@ struct ControlPanelView: View {
             }
         }
 
-        section("Status Bar", systemImage: "wifi", isExpanded: $showStatusBar) {
+        section("Status Bar", systemImage: "wifi") {
             statusBarContent
         }
 
-        section("Location", systemImage: "location", isExpanded: $showLocation) {
+        section("Location", systemImage: "location") {
             locationContent
         }
 
-        section("Push Notification", systemImage: "bell", isExpanded: $showPush) {
+        section("Push Notification", systemImage: "bell") {
             pushContent
         }
 
-        section("Privacy", systemImage: "lock.shield", isExpanded: $showPrivacy) {
+        section("Privacy", systemImage: "lock.shield") {
             privacyContent
         }
 
-        section("Open URL", systemImage: "link", isExpanded: $showOpenURL) {
+        section("Open URL", systemImage: "link") {
             openURLContent
         }
     }
@@ -347,19 +337,14 @@ struct ControlPanelView: View {
     private func section<Content: View>(
         _ title: String,
         systemImage: String,
-        isExpanded: Binding<Bool>,
         @ViewBuilder content: @escaping () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Divider()
-            DisclosureGroup(isExpanded: isExpanded) {
-                VStack(alignment: .leading, spacing: 8) {
-                    content()
-                }
-                .padding(.top, 4)
-            } label: {
+            VStack(alignment: .leading, spacing: 8) {
                 Label(title, systemImage: systemImage)
                     .font(.subheadline.weight(.medium))
+                content()
             }
             .padding(.vertical, 6)
         }
