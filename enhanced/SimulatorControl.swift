@@ -1,6 +1,13 @@
 import Foundation
 import Observation
 
+struct BootedDevice: Identifiable, Sendable {
+    let udid: String
+    let name: String
+    let runtime: String
+    var id: String { udid }
+}
+
 @Observable
 class SimulatorControl {
     var isDarkMode = false
@@ -15,6 +22,28 @@ class SimulatorControl {
     var buttonShapes = false
     var grayscale = false
     var differentiateWithoutColor = false
+
+    // Device management
+    var bootedDevices: [BootedDevice] = []
+    var selectedDeviceUDID = ""
+
+    var selectedDevice: BootedDevice? {
+        bootedDevices.first { $0.udid == selectedDeviceUDID }
+    }
+
+    private var deviceId: String {
+        selectedDeviceUDID.isEmpty ? "booted" : selectedDeviceUDID
+    }
+
+    func selectDeviceByWindowTitle(_ title: String) {
+        // Sort longest name first to avoid "iPhone 16" matching before "iPhone 16 Pro"
+        let sorted = bootedDevices.sorted { $0.name.count > $1.name.count }
+        guard let device = sorted.first(where: { title.hasPrefix($0.name) }) else { return }
+        if selectedDeviceUDID != device.udid {
+            selectedDeviceUDID = device.udid
+            syncSettings()
+        }
+    }
 
     static let contentSizes: [(label: String, value: String)] = [
         ("XS",     "extra-small"),
@@ -40,12 +69,12 @@ class SimulatorControl {
     // MARK: - Apply
 
     func applyAppearance() {
-        simctl(["ui", "booted", "appearance", isDarkMode ? "dark" : "light"])
+        simctl(["ui", deviceId, "appearance", isDarkMode ? "dark" : "light"])
     }
 
     func applyContentSize() {
         let idx = min(max(Int(contentSizeIndex), 0), Self.contentSizes.count - 1)
-        simctl(["ui", "booted", "content_size", Self.contentSizes[idx].value])
+        simctl(["ui", deviceId, "content_size", Self.contentSizes[idx].value])
     }
 
     func applyInvertColors() {
@@ -53,7 +82,7 @@ class SimulatorControl {
     }
 
     func applyIncreaseContrast() {
-        simctl(["ui", "booted", "increase_contrast", increaseContrast ? "enabled" : "disabled"])
+        simctl(["ui", deviceId, "increase_contrast", increaseContrast ? "enabled" : "disabled"])
     }
 
     func applyReduceTransparency() {
@@ -82,6 +111,48 @@ class SimulatorControl {
 
     // MARK: - Sync
 
+    func syncWithSimulator() {
+        Task {
+            let devices = await Task.detached { Self.fetchBootedDevices() }.value
+            bootedDevices = devices
+            if !devices.contains(where: { $0.udid == selectedDeviceUDID }) {
+                selectedDeviceUDID = devices.first?.udid ?? ""
+            }
+            await applyFetchedState()
+        }
+    }
+
+    func syncSettings() {
+        Task { await applyFetchedState() }
+    }
+
+    func refreshDevices() {
+        Task {
+            let devices = await Task.detached { Self.fetchBootedDevices() }.value
+            bootedDevices = devices
+            if !devices.contains(where: { $0.udid == selectedDeviceUDID }) {
+                selectedDeviceUDID = devices.first?.udid ?? ""
+            }
+        }
+    }
+
+    private func applyFetchedState() async {
+        let id = deviceId
+        let state = await Task.detached { Self.fetchCurrentState(deviceId: id) }.value
+        isDarkMode = state.isDarkMode
+        contentSizeIndex = state.contentSizeIndex
+        invertColors = state.invertColors
+        increaseContrast = state.increaseContrast
+        reduceTransparency = state.reduceTransparency
+        reduceMotion = state.reduceMotion
+        onOffLabels = state.onOffLabels
+        buttonShapes = state.buttonShapes
+        grayscale = state.grayscale
+        differentiateWithoutColor = state.differentiateWithoutColor
+    }
+
+    // MARK: - Fetch (nonisolated)
+
     private struct State: Sendable {
         let isDarkMode: Bool
         let contentSizeIndex: Double
@@ -95,46 +166,68 @@ class SimulatorControl {
         let differentiateWithoutColor: Bool
     }
 
-    func syncWithSimulator() {
-        Task {
-            let state = await Task.detached { Self.fetchCurrentState() }.value
-            isDarkMode = state.isDarkMode
-            contentSizeIndex = state.contentSizeIndex
-            invertColors = state.invertColors
-            increaseContrast = state.increaseContrast
-            reduceTransparency = state.reduceTransparency
-            reduceMotion = state.reduceMotion
-            onOffLabels = state.onOffLabels
-            buttonShapes = state.buttonShapes
-            grayscale = state.grayscale
-            differentiateWithoutColor = state.differentiateWithoutColor
-        }
-    }
-
-    nonisolated private static func fetchCurrentState() -> State {
-        let appearance = readSimctl(["ui", "booted", "appearance"])
-        let contentSize = readSimctl(["ui", "booted", "content_size"])
-        let contrast = readSimctl(["ui", "booted", "increase_contrast"])
+    nonisolated private static func fetchCurrentState(deviceId: String) -> State {
+        let appearance = readSimctl(["ui", deviceId, "appearance"])
+        let contentSize = readSimctl(["ui", deviceId, "content_size"])
+        let contrast = readSimctl(["ui", deviceId, "increase_contrast"])
 
         let contentSizeIdx: Double
         if let idx = contentSizes.firstIndex(where: { $0.value == contentSize }) {
             contentSizeIdx = Double(idx)
         } else {
-            contentSizeIdx = 3 // default "large"
+            contentSizeIdx = 3
         }
 
         return State(
             isDarkMode: appearance == "dark",
             contentSizeIndex: contentSizeIdx,
-            invertColors: readAccessibilityBool("InvertColorsEnabled"),
+            invertColors: readAccessibilityBool("InvertColorsEnabled", deviceId: deviceId),
             increaseContrast: contrast == "enabled",
-            reduceTransparency: readAccessibilityBool("EnhancedBackgroundContrastEnabled"),
-            reduceMotion: readAccessibilityBool("ReduceMotionEnabled"),
-            onOffLabels: readAccessibilityBool("OnOffLabelsEnabled"),
-            buttonShapes: readAccessibilityBool("ButtonShapesEnabled"),
-            grayscale: readAccessibilityBool("GrayscaleEnabled"),
-            differentiateWithoutColor: readAccessibilityBool("DifferentiateWithoutColor")
+            reduceTransparency: readAccessibilityBool("EnhancedBackgroundContrastEnabled", deviceId: deviceId),
+            reduceMotion: readAccessibilityBool("ReduceMotionEnabled", deviceId: deviceId),
+            onOffLabels: readAccessibilityBool("OnOffLabelsEnabled", deviceId: deviceId),
+            buttonShapes: readAccessibilityBool("ButtonShapesEnabled", deviceId: deviceId),
+            grayscale: readAccessibilityBool("GrayscaleEnabled", deviceId: deviceId),
+            differentiateWithoutColor: readAccessibilityBool("DifferentiateWithoutColor", deviceId: deviceId)
         )
+    }
+
+    private struct DeviceList: Decodable, Sendable {
+        let devices: [String: [DeviceEntry]]
+    }
+
+    private struct DeviceEntry: Decodable, Sendable {
+        let udid: String
+        let name: String
+        let state: String
+    }
+
+    nonisolated private static func fetchBootedDevices() -> [BootedDevice] {
+        let json = readSimctl(["list", "devices", "booted", "-j"])
+        guard let data = json.data(using: .utf8),
+              let list = try? JSONDecoder().decode(DeviceList.self, from: data)
+        else { return [] }
+
+        return list.devices.flatMap { runtime, entries in
+            entries.filter { $0.state == "Booted" }.map { entry in
+                BootedDevice(
+                    udid: entry.udid,
+                    name: entry.name,
+                    runtime: formatRuntime(runtime)
+                )
+            }
+        }
+    }
+
+    nonisolated private static func formatRuntime(_ identifier: String) -> String {
+        // "com.apple.CoreSimulator.SimRuntime.iOS-26-2" → "iOS 26.2"
+        let prefix = "com.apple.CoreSimulator.SimRuntime."
+        let cleaned = identifier.hasPrefix(prefix)
+            ? String(identifier.dropFirst(prefix.count))
+            : identifier
+        let parts = cleaned.split(separator: "-")
+        guard parts.count >= 2 else { return cleaned }
+        return "\(parts[0]) \(parts[1...].joined(separator: "."))"
     }
 
     nonisolated private static func readSimctl(_ arguments: [String]) -> String {
@@ -151,15 +244,15 @@ class SimulatorControl {
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 
-    nonisolated private static func readAccessibilityBool(_ key: String) -> Bool {
-        readSimctl(["spawn", "booted", "defaults", "read", "com.apple.Accessibility", key]) == "1"
+    nonisolated private static func readAccessibilityBool(_ key: String, deviceId: String) -> Bool {
+        readSimctl(["spawn", deviceId, "defaults", "read", "com.apple.Accessibility", key]) == "1"
     }
 
     // MARK: - Private
 
     private func setAccessibilityPref(_ key: String, enabled: Bool) {
         simctl([
-            "spawn", "booted", "defaults", "write",
+            "spawn", deviceId, "defaults", "write",
             "com.apple.Accessibility", key, "-bool", enabled ? "YES" : "NO",
         ])
     }

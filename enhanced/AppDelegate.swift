@@ -9,6 +9,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let simulatorControl = SimulatorControl()
     private var isPanelVisible = true
     private var lastSimulatorFrame: CGRect?
+    private var lastWindowCount = 0
     private var hasSynced = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -78,7 +79,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         withObservationTracking {
             handleTrackerUpdate(
                 frame: windowTracker.simulatorFrame,
-                focused: windowTracker.isSimulatorFocused
+                focused: windowTracker.isSimulatorFocused,
+                windowCount: windowTracker.simulatorWindowCount,
+                windowTitle: windowTracker.activeWindowTitle
             )
         } onChange: { [weak self] in
             DispatchQueue.main.async {
@@ -87,10 +90,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func handleTrackerUpdate(frame: CGRect?, focused: Bool) {
+    private func handleTrackerUpdate(frame: CGRect?, focused: Bool, windowCount: Int, windowTitle: String?) {
         guard let frame else {
             panel.orderOut(nil)
             lastSimulatorFrame = nil
+            lastWindowCount = 0
             hasSynced = false
             return
         }
@@ -98,6 +102,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if !hasSynced {
             hasSynced = true
             simulatorControl.syncWithSimulator()
+        }
+
+        if windowCount != lastWindowCount {
+            lastWindowCount = windowCount
+            if hasSynced {
+                simulatorControl.refreshDevices()
+            }
+        }
+
+        // Auto-select device based on focused Simulator window
+        if let title = windowTitle {
+            simulatorControl.selectDeviceByWindowTitle(title)
         }
 
         if frame != lastSimulatorFrame {
@@ -121,19 +137,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let screenHeight = screen.frame.height
         let panelSize = panel.frame.size
 
-        // CG coords: top-left origin → NS coords: bottom-left origin
-        // Align panel top with simulator top
         let panelX = simulatorFrame.maxX + 12
         let panelY = screenHeight - simulatorFrame.origin.y - panelSize.height
 
         var origin = NSPoint(x: panelX, y: panelY)
 
-        // Fall back to left side if off-screen right
         if panelX + panelSize.width > screen.visibleFrame.maxX {
             origin.x = simulatorFrame.origin.x - panelSize.width - 12
         }
 
-        // Clamp Y to visible area
         origin.y = max(
             screen.visibleFrame.minY,
             min(origin.y, screen.visibleFrame.maxY - panelSize.height)

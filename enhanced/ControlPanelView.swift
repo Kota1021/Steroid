@@ -6,13 +6,21 @@ struct ControlPanelView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            // Header with connection status
+            // Header with active device
             HStack(spacing: 6) {
                 Circle()
                     .fill(windowTracker.isSimulatorRunning ? .green : .secondary)
                     .frame(width: 8, height: 8)
-                Text("Simulator")
-                    .font(.headline)
+                if let device = control.selectedDevice {
+                    Text(device.name)
+                        .font(.headline)
+                    Text(device.runtime)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Simulator")
+                        .font(.headline)
+                }
                 Spacer()
             }
 

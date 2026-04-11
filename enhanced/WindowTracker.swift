@@ -1,10 +1,13 @@
 import AppKit
+import ApplicationServices
 import Observation
 
 @Observable
 class WindowTracker {
     var simulatorFrame: CGRect?
     var isSimulatorFocused = false
+    var simulatorWindowCount = 0
+    var activeWindowTitle: String?
 
     @ObservationIgnored private var timer: Timer?
     @ObservationIgnored private var activationObserver: Any?
@@ -45,6 +48,8 @@ class WindowTracker {
 
         guard let simulatorApp = simulatorApps.first else {
             if simulatorFrame != nil { simulatorFrame = nil }
+            if simulatorWindowCount != 0 { simulatorWindowCount = 0 }
+            if activeWindowTitle != nil { activeWindowTitle = nil }
             return
         }
 
@@ -57,8 +62,8 @@ class WindowTracker {
             return
         }
 
-        var bestFrame: CGRect?
-        var bestArea: CGFloat = 0
+        var frontmostFrame: CGRect?
+        var count = 0
 
         for window in windowList {
             guard let ownerPID = window[kCGWindowOwnerPID as String] as? pid_t,
@@ -74,15 +79,38 @@ class WindowTracker {
 
             guard rect.width > 100, rect.height > 100 else { continue }
 
-            let area = rect.width * rect.height
-            if area > bestArea {
-                bestArea = area
-                bestFrame = rect
+            count += 1
+            if frontmostFrame == nil {
+                frontmostFrame = rect
             }
         }
 
-        if simulatorFrame != bestFrame {
-            simulatorFrame = bestFrame
+        if simulatorFrame != frontmostFrame {
+            simulatorFrame = frontmostFrame
         }
+        if simulatorWindowCount != count {
+            simulatorWindowCount = count
+        }
+
+        // Get focused Simulator window title via Accessibility API
+        let title = focusedWindowTitle(pid: pid)
+        if activeWindowTitle != title {
+            activeWindowTitle = title
+        }
+    }
+
+    private func focusedWindowTitle(pid: pid_t) -> String? {
+        let axApp = AXUIElementCreateApplication(pid)
+        var focusedRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            axApp, kAXFocusedWindowAttribute as CFString, &focusedRef
+        ) == .success else { return nil }
+
+        var titleRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            focusedRef as! AXUIElement, kAXTitleAttribute as CFString, &titleRef
+        ) == .success else { return nil }
+
+        return titleRef as? String
     }
 }
