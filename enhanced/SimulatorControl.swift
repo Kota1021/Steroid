@@ -109,6 +109,62 @@ class SimulatorControl {
         setAccessibilityPref("DifferentiateWithoutColor", enabled: differentiateWithoutColor)
     }
 
+    // MARK: - Capture
+
+    var isRecording = false
+    @ObservationIgnored private var recordingProcess: Process?
+
+    private func captureFileName(ext: String) -> String {
+        let device = selectedDevice
+        let name = device?.name ?? "Simulator"
+        let runtime = device?.runtime.replacingOccurrences(of: " ", with: "") ?? ""
+        let df = DateFormatter()
+        df.dateFormat = "yyyyMMdd-HHmmss"
+        let timestamp = df.string(from: Date())
+        return "\(name)-\(runtime)-\(timestamp).\(ext)"
+    }
+
+    func takeScreenshot() {
+        let id = deviceId
+        let filename = captureFileName(ext: "png")
+        Task.detached {
+            let desktop = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first!
+            let path = desktop.appendingPathComponent(filename).path
+            Self.runSimctlSync(["io", id, "screenshot", "--mask=black", path])
+        }
+    }
+
+    func toggleRecording() {
+        if isRecording {
+            stopRecording()
+        } else {
+            startRecording()
+        }
+    }
+
+    private func startRecording() {
+        let id = deviceId
+        isRecording = true
+        let filename = captureFileName(ext: "mp4")
+        let desktop = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first!
+        let path = desktop.appendingPathComponent(filename).path
+        Task.detached { @MainActor [weak self] in
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+            process.arguments = ["simctl", "io", id, "recordVideo", "--codec=h264", "--force", path]
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
+            try? process.run()
+            self?.recordingProcess = process
+        }
+    }
+
+    private func stopRecording() {
+        recordingProcess?.interrupt() // sends SIGINT to stop recording
+        recordingProcess = nil
+        isRecording = false
+    }
+
     // MARK: - Sync
 
     func syncWithSimulator() {
@@ -243,6 +299,11 @@ class SimulatorControl {
         let parts = cleaned.split(separator: "-")
         guard parts.count >= 2 else { return cleaned }
         return "\(parts[0]) \(parts[1...].joined(separator: "."))"
+    }
+
+    nonisolated private static func runSimctlSync(_ arguments: [String]) {
+        let (process, _) = startSimctl(arguments)
+        process.waitUntilExit()
     }
 
     nonisolated private static func startSimctl(_ arguments: [String]) -> (Process, Pipe) {

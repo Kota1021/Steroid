@@ -116,6 +116,29 @@ struct ControlPanelView: View {
             accessibilityToggle("Without Color", systemImage: "circle.lefthalf.striped.horizontal",
                                 isOn: $control.differentiateWithoutColor) { control.applyDifferentiateWithoutColor() }
         }
+
+        Divider()
+
+        // Capture
+        HStack(spacing: 12) {
+            Button {
+                control.takeScreenshot()
+            } label: {
+                Label("Screenshot", systemImage: "camera")
+                    .frame(maxWidth: .infinity)
+            }
+            .controlSize(.small)
+
+            Button {
+                control.toggleRecording()
+            } label: {
+                Label(control.isRecording ? "Stop" : "Record",
+                      systemImage: control.isRecording ? "stop.circle.fill" : "record.circle")
+                    .frame(maxWidth: .infinity)
+            }
+            .controlSize(.small)
+            .tint(control.isRecording ? .red : nil)
+        }
     }
 
     // MARK: - Helpers
