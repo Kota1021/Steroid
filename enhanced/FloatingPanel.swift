@@ -32,4 +32,12 @@ class FloatingPanel: NSPanel {
     // Allow controls to receive mouse events without activating the app
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+
+    override func becomeKey() {
+        super.becomeKey()
+        // Bring Simulator to front alongside this panel
+        NSWorkspace.shared.runningApplications
+            .first { $0.bundleIdentifier == "com.apple.iphonesimulator" }?
+            .activate()
+    }
 }
