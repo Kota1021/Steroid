@@ -29,15 +29,18 @@ class FloatingPanel: NSPanel {
         contentView = visualEffect
     }
 
-    // Allow controls to receive mouse events without activating the app
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 
-    override func becomeKey() {
-        super.becomeKey()
-        // Bring Simulator to front alongside this panel
-        NSWorkspace.shared.runningApplications
-            .first { $0.bundleIdentifier == "com.apple.iphonesimulator" }?
-            .activate()
+    // Force active appearance so controls never gray out
+    override var isKeyWindow: Bool { true }
+
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .leftMouseDown {
+            NSWorkspace.shared.runningApplications
+                .first { $0.bundleIdentifier == "com.apple.iphonesimulator" }?
+                .activate()
+        }
+        super.sendEvent(event)
     }
 }
