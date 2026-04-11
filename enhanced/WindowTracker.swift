@@ -14,6 +14,7 @@ class WindowTracker {
     @ObservationIgnored private var stateTimer: Timer?
     @ObservationIgnored private var activationObserver: Any?
     @ObservationIgnored private var trackedPID: pid_t = 0
+    @ObservationIgnored private var fastTickCount = 0
 
     /// Direct callback — bypasses @Observable for zero-latency panel repositioning
     @ObservationIgnored var onFrameChanged: ((CGRect) -> Void)?
@@ -65,7 +66,16 @@ class WindowTracker {
     // MARK: - Fast path (60fps) — single window position only
 
     private func updateWindowPosition() {
-        guard simulatorWindowID != 0 else { return }
+        guard simulatorWindowID != 0, trackedPID != 0 else { return }
+
+        // Every ~100ms (6 ticks at 60fps): check if frontmost window changed
+        fastTickCount += 1
+        if fastTickCount % 6 == 0,
+           let frontWID = frontmostSimulatorWindowID(),
+           frontWID != simulatorWindowID {
+            updateSimulatorState()
+            return
+        }
 
         // Query only the tracked window (not the entire window list)
         guard let infos = CGWindowListCopyWindowInfo(
@@ -81,6 +91,28 @@ class WindowTracker {
         if simulatorFrame != rect {
             simulatorFrame = rect
         }
+    }
+
+    /// Returns the window ID of the frontmost Simulator window, or nil
+    private func frontmostSimulatorWindowID() -> UInt32? {
+        guard let windowList = CGWindowListCopyWindowInfo(
+            [.optionOnScreenOnly, .excludeDesktopElements],
+            kCGNullWindowID
+        ) as? [[String: Any]] else { return nil }
+
+        for window in windowList {
+            guard let ownerPID = window[kCGWindowOwnerPID as String] as? pid_t,
+                  ownerPID == trackedPID,
+                  let layer = window[kCGWindowLayer as String] as? Int,
+                  layer == 0,
+                  let boundsDict = window[kCGWindowBounds as String],
+                  let rect = CGRect(dictionaryRepresentation: boundsDict as! CFDictionary),
+                  rect.width > 100, rect.height > 100,
+                  let wid = window[kCGWindowNumber as String] as? Int
+            else { continue }
+            return UInt32(wid)
+        }
+        return nil
     }
 
     // MARK: - Slow path (2s) — full state discovery
