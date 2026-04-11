@@ -165,6 +165,7 @@ struct ControlPanelView: View {
                 TextField("9:41", text: $control.statusBarTime)
                     .textFieldStyle(.roundedBorder)
                     .controlSize(.small)
+                    .onSubmit { control.applyStatusBar() }
             }
             HStack {
                 Text("Network")
@@ -175,6 +176,7 @@ struct ControlPanelView: View {
                 .labelsHidden()
                 .pickerStyle(.menu)
                 .controlSize(.small)
+                .onChange(of: control.statusBarNetwork) { _, _ in control.applyStatusBar() }
             }
             HStack {
                 Text("WiFi")
@@ -184,6 +186,7 @@ struct ControlPanelView: View {
                 }
                 .pickerStyle(.segmented)
                 .controlSize(.small)
+                .onChange(of: control.statusBarWiFiBars) { _, _ in control.applyStatusBar() }
             }
             HStack {
                 Text("Cell")
@@ -193,6 +196,7 @@ struct ControlPanelView: View {
                 }
                 .pickerStyle(.segmented)
                 .controlSize(.small)
+                .onChange(of: control.statusBarCellularBars) { _, _ in control.applyStatusBar() }
             }
             HStack {
                 Text("Carrier")
@@ -200,6 +204,7 @@ struct ControlPanelView: View {
                 TextField("Carrier", text: $control.statusBarOperator)
                     .textFieldStyle(.roundedBorder)
                     .controlSize(.small)
+                    .onSubmit { control.applyStatusBar() }
             }
             HStack {
                 Text("Battery")
@@ -210,20 +215,16 @@ struct ControlPanelView: View {
                 .labelsHidden()
                 .pickerStyle(.menu)
                 .controlSize(.small)
+                .onChange(of: control.statusBarBatteryState) { _, _ in control.applyStatusBar() }
                 Text("\(Int(control.statusBarBatteryLevel))%")
                     .font(.caption.monospaced())
                     .frame(width: 32)
             }
             Slider(value: $control.statusBarBatteryLevel, in: 0...100, step: 1)
                 .controlSize(.small)
-            HStack(spacing: 8) {
-                Button("Apply") { control.applyStatusBar() }
-                    .controlSize(.small)
-                    .frame(maxWidth: .infinity)
-                Button("Clear") { control.clearStatusBar() }
-                    .controlSize(.small)
-                    .frame(maxWidth: .infinity)
-            }
+                .onChange(of: control.statusBarBatteryLevel) { _, _ in control.applyStatusBar() }
+            Button("Clear") { control.clearStatusBar() }
+                .controlSize(.small)
         }
     }
 
