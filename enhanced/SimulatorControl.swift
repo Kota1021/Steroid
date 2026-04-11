@@ -167,9 +167,24 @@ class SimulatorControl {
     }
 
     nonisolated private static func fetchCurrentState(deviceId: String) -> State {
-        let appearance = readSimctl(["ui", deviceId, "appearance"])
-        let contentSize = readSimctl(["ui", deviceId, "content_size"])
-        let contrast = readSimctl(["ui", deviceId, "increase_contrast"])
+        // Launch all 4 processes concurrently
+        let (appProc, appPipe) = startSimctl(["ui", deviceId, "appearance"])
+        let (csProc, csPipe) = startSimctl(["ui", deviceId, "content_size"])
+        let (conProc, conPipe) = startSimctl(["ui", deviceId, "increase_contrast"])
+        let (accProc, accPipe) = startSimctl([
+            "spawn", deviceId, "defaults", "read", "com.apple.Accessibility",
+        ])
+
+        // Wait for all to finish
+        appProc.waitUntilExit()
+        csProc.waitUntilExit()
+        conProc.waitUntilExit()
+        accProc.waitUntilExit()
+
+        let appearance = readPipe(appPipe)
+        let contentSize = readPipe(csPipe)
+        let contrast = readPipe(conPipe)
+        let acc = parseAccessibilityDefaults(readPipe(accPipe))
 
         let contentSizeIdx: Double
         if let idx = contentSizes.firstIndex(where: { $0.value == contentSize }) {
@@ -181,14 +196,14 @@ class SimulatorControl {
         return State(
             isDarkMode: appearance == "dark",
             contentSizeIndex: contentSizeIdx,
-            invertColors: readAccessibilityBool("InvertColorsEnabled", deviceId: deviceId),
+            invertColors: acc["InvertColorsEnabled"] ?? false,
             increaseContrast: contrast == "enabled",
-            reduceTransparency: readAccessibilityBool("EnhancedBackgroundContrastEnabled", deviceId: deviceId),
-            reduceMotion: readAccessibilityBool("ReduceMotionEnabled", deviceId: deviceId),
-            onOffLabels: readAccessibilityBool("OnOffLabelsEnabled", deviceId: deviceId),
-            buttonShapes: readAccessibilityBool("ButtonShapesEnabled", deviceId: deviceId),
-            grayscale: readAccessibilityBool("GrayscaleEnabled", deviceId: deviceId),
-            differentiateWithoutColor: readAccessibilityBool("DifferentiateWithoutColor", deviceId: deviceId)
+            reduceTransparency: acc["EnhancedBackgroundContrastEnabled"] ?? false,
+            reduceMotion: acc["ReduceMotionEnabled"] ?? false,
+            onOffLabels: acc["OnOffLabelsEnabled"] ?? false,
+            buttonShapes: acc["ButtonShapesEnabled"] ?? false,
+            grayscale: acc["GrayscaleEnabled"] ?? false,
+            differentiateWithoutColor: acc["DifferentiateWithoutColor"] ?? false
         )
     }
 
@@ -230,7 +245,7 @@ class SimulatorControl {
         return "\(parts[0]) \(parts[1...].joined(separator: "."))"
     }
 
-    nonisolated private static func readSimctl(_ arguments: [String]) -> String {
+    nonisolated private static func startSimctl(_ arguments: [String]) -> (Process, Pipe) {
         let process = Process()
         let pipe = Pipe()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
@@ -238,14 +253,34 @@ class SimulatorControl {
         process.standardOutput = pipe
         process.standardError = FileHandle.nullDevice
         try? process.run()
-        process.waitUntilExit()
+        return (process, pipe)
+    }
+
+    nonisolated private static func readPipe(_ pipe: Pipe) -> String {
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         return String(data: data, encoding: .utf8)?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 
-    nonisolated private static func readAccessibilityBool(_ key: String, deviceId: String) -> Bool {
-        readSimctl(["spawn", deviceId, "defaults", "read", "com.apple.Accessibility", key]) == "1"
+    nonisolated private static func readSimctl(_ arguments: [String]) -> String {
+        let (process, pipe) = startSimctl(arguments)
+        process.waitUntilExit()
+        return readPipe(pipe)
+    }
+
+    nonisolated private static func parseAccessibilityDefaults(_ output: String) -> [String: Bool] {
+        var dict: [String: Bool] = [:]
+        for line in output.components(separatedBy: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let eqRange = trimmed.range(of: " = ") else { continue }
+            let key = trimmed[..<eqRange.lowerBound]
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+            let rawValue = String(trimmed[eqRange.upperBound...])
+                .trimmingCharacters(in: CharacterSet(charactersIn: "; \t\""))
+            dict[key] = rawValue == "1"
+        }
+        return dict
     }
 
     // MARK: - Private
