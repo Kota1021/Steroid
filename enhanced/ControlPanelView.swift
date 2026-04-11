@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct ControlPanelView: View {
-    @ObservedObject var control: SimulatorControl
-    @ObservedObject var windowTracker: WindowTracker
+    @Bindable var control: SimulatorControl
+    var windowTracker: WindowTracker
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {

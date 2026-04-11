@@ -1,5 +1,5 @@
 import AppKit
-import Combine
+import Observation
 import SwiftUI
 
 class AppDelegate: NSObject, NSApplicationDelegate {
@@ -7,7 +7,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var panel: FloatingPanel!
     private let windowTracker = WindowTracker()
     private let simulatorControl = SimulatorControl()
-    private var cancellables = Set<AnyCancellable>()
     private var isPanelVisible = true
     private var lastSimulatorFrame: CGRect?
 
@@ -71,35 +70,39 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupTracking() {
         windowTracker.startTracking()
+        observeChanges()
+    }
 
-        windowTracker.$simulatorFrame
-            .receive(on: RunLoop.main)
-            .sink { [weak self] frame in
-                guard let self else { return }
-                guard let frame else {
-                    self.panel.orderOut(nil)
-                    self.lastSimulatorFrame = nil
-                    return
-                }
-
-                if frame != self.lastSimulatorFrame {
-                    self.lastSimulatorFrame = frame
-                    self.positionPanel(relativeTo: frame)
-                }
-
-                if self.isPanelVisible {
-                    self.panel.orderFront(nil)
-                }
+    private func observeChanges() {
+        withObservationTracking {
+            handleTrackerUpdate(
+                frame: windowTracker.simulatorFrame,
+                focused: windowTracker.isSimulatorFocused
+            )
+        } onChange: { [weak self] in
+            DispatchQueue.main.async {
+                self?.observeChanges()
             }
-            .store(in: &cancellables)
+        }
+    }
 
-        windowTracker.$isSimulatorFocused
-            .receive(on: RunLoop.main)
-            .sink { [weak self] focused in
-                guard let self, self.isPanelVisible else { return }
-                self.panel.level = focused ? .floating : .normal
-            }
-            .store(in: &cancellables)
+    private func handleTrackerUpdate(frame: CGRect?, focused: Bool) {
+        guard let frame else {
+            panel.orderOut(nil)
+            lastSimulatorFrame = nil
+            return
+        }
+
+        if frame != lastSimulatorFrame {
+            lastSimulatorFrame = frame
+            positionPanel(relativeTo: frame)
+        }
+
+        if isPanelVisible {
+            panel.orderFront(nil)
+        }
+
+        panel.level = focused ? .floating : .normal
     }
 
     private func positionPanel(relativeTo simulatorFrame: CGRect) {

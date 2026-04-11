@@ -1,19 +1,20 @@
-import Combine
 import Foundation
+import Observation
 
-class SimulatorControl: ObservableObject {
-    @Published var isDarkMode = false
-    @Published var contentSizeIndex: Double = 3 // "large" = default
+@Observable
+class SimulatorControl {
+    var isDarkMode = false
+    var contentSizeIndex: Double = 3 // "large" = default
 
     // Accessibility options (matches Accessibility Inspector order)
-    @Published var invertColors = false
-    @Published var increaseContrast = false
-    @Published var reduceTransparency = false
-    @Published var reduceMotion = false
-    @Published var onOffLabels = false
-    @Published var buttonShapes = false
-    @Published var grayscale = false
-    @Published var differentiateWithoutColor = false
+    var invertColors = false
+    var increaseContrast = false
+    var reduceTransparency = false
+    var reduceMotion = false
+    var onOffLabels = false
+    var buttonShapes = false
+    var grayscale = false
+    var differentiateWithoutColor = false
 
     static let contentSizes: [(label: String, value: String)] = [
         ("XS",     "extra-small"),

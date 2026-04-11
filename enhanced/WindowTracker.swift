@@ -1,12 +1,13 @@
 import AppKit
-import Combine
+import Observation
 
-class WindowTracker: ObservableObject {
-    @Published var simulatorFrame: CGRect?
-    @Published var isSimulatorFocused = false
+@Observable
+class WindowTracker {
+    var simulatorFrame: CGRect?
+    var isSimulatorFocused = false
 
-    private var timer: Timer?
-    private var activationObserver: Any?
+    @ObservationIgnored private var timer: Timer?
+    @ObservationIgnored private var activationObserver: Any?
 
     var isSimulatorRunning: Bool {
         simulatorFrame != nil
@@ -38,7 +39,6 @@ class WindowTracker: ObservableObject {
     }
 
     private func updateSimulatorFrame() {
-        // Find Simulator by bundle ID — no Screen Recording permission needed
         let simulatorApps = NSWorkspace.shared.runningApplications.filter {
             $0.bundleIdentifier == "com.apple.iphonesimulator"
         }
@@ -57,7 +57,6 @@ class WindowTracker: ObservableObject {
             return
         }
 
-        // Find the largest Simulator window (the device window)
         var bestFrame: CGRect?
         var bestArea: CGFloat = 0
 
