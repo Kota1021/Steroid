@@ -106,10 +106,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         if isPanelVisible {
-            panel.orderFront(nil)
+            if focused {
+                panel.level = .floating
+                panel.orderFront(nil)
+            } else {
+                panel.level = .normal
+                panel.orderBack(nil)
+            }
         }
-
-        panel.level = focused ? .floating : .normal
     }
 
     private func positionPanel(relativeTo simulatorFrame: CGRect) {
