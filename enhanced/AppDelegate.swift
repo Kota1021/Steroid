@@ -144,23 +144,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func positionPanel(relativeTo simulatorFrame: CGRect) {
         guard let screen = NSScreen.screens.first else { return }
         let screenHeight = screen.frame.height
-        let panelSize = panel.frame.size
+        let panelWidth = panel.frame.width
+        let panelHeight = simulatorFrame.height
 
         let panelX = simulatorFrame.maxX + 12
-        let panelY = screenHeight - simulatorFrame.origin.y - panelSize.height
+        let panelY = screenHeight - simulatorFrame.origin.y - panelHeight
 
-        var origin = NSPoint(x: panelX, y: panelY)
+        var frame = NSRect(x: panelX, y: panelY, width: panelWidth, height: panelHeight)
 
-        if panelX + panelSize.width > screen.visibleFrame.maxX {
-            origin.x = simulatorFrame.origin.x - panelSize.width - 12
+        if frame.maxX > screen.visibleFrame.maxX {
+            frame.origin.x = simulatorFrame.origin.x - panelWidth - 12
         }
 
-        origin.y = max(
+        frame.origin.y = max(
             screen.visibleFrame.minY,
-            min(origin.y, screen.visibleFrame.maxY - panelSize.height)
+            min(frame.origin.y, screen.visibleFrame.maxY - panelHeight)
         )
 
-        panel.setFrameOrigin(origin)
+        panel.setFrame(frame, display: true)
     }
 
     @objc private func togglePanel() {
