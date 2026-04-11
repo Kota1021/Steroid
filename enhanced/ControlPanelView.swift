@@ -265,9 +265,7 @@ struct ControlPanelView: View {
 
     private var pushContent: some View {
         VStack(alignment: .leading, spacing: 6) {
-            TextField("Bundle ID", text: $control.pushBundleID)
-                .textFieldStyle(.roundedBorder)
-                .controlSize(.small)
+            appPicker(selection: $control.pushBundleID)
             TextField("Title", text: $control.pushTitle)
                 .textFieldStyle(.roundedBorder)
                 .controlSize(.small)
@@ -292,9 +290,7 @@ struct ControlPanelView: View {
             .pickerStyle(.menu)
             .controlSize(.small)
 
-            TextField("Bundle ID", text: $control.privacyBundleID)
-                .textFieldStyle(.roundedBorder)
-                .controlSize(.small)
+            appPicker(selection: $control.privacyBundleID)
 
             HStack(spacing: 6) {
                 Button("Grant") { control.grantPrivacy() }
@@ -326,6 +322,27 @@ struct ControlPanelView: View {
     }
 
     // MARK: - Helpers
+
+    private func appPicker(selection: Binding<String>) -> some View {
+        Picker("App", selection: selection) {
+            if control.userApps.isEmpty {
+                Text("No apps").tag("")
+            }
+            ForEach(control.userApps) { app in
+                HStack(spacing: 4) {
+                    if app.isRunning {
+                        Image(systemName: "circle.fill")
+                            .font(.system(size: 5))
+                            .foregroundStyle(.green)
+                    }
+                    Text(app.name)
+                }
+                .tag(app.bundleID)
+            }
+        }
+        .pickerStyle(.menu)
+        .controlSize(.small)
+    }
 
     private func section<Content: View>(
         _ title: String,

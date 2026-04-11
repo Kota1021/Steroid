@@ -8,6 +8,13 @@ struct BootedDevice: Identifiable, Sendable {
     var id: String { udid }
 }
 
+struct InstalledApp: Identifiable, Sendable {
+    let bundleID: String
+    let name: String
+    let isRunning: Bool
+    var id: String { bundleID }
+}
+
 @Observable
 class SimulatorControl {
     var isDarkMode = false
@@ -26,6 +33,7 @@ class SimulatorControl {
     // Device management
     var bootedDevices: [BootedDevice] = []
     var selectedDeviceUDID = ""
+    var userApps: [InstalledApp] = []
 
     var selectedDevice: BootedDevice? {
         bootedDevices.first { $0.udid == selectedDeviceUDID }
@@ -262,9 +270,14 @@ class SimulatorControl {
         guard !pushBundleID.isEmpty else { return }
         let id = deviceId
         let bundleId = pushBundleID
-        let json: [String: Any] = [
-            "aps": ["alert": ["title": pushTitle, "body": pushBody]],
+        let title = pushTitle.isEmpty ? "Test Notification" : pushTitle
+        let body = pushBody.isEmpty ? "" : pushBody
+        var aps: [String: Any] = [
+            "alert": ["title": title, "body": body],
+            "sound": "default",
         ]
+        if body.isEmpty { aps["alert"] = title }
+        let json: [String: Any] = ["aps": aps]
         guard let data = try? JSONSerialization.data(withJSONObject: json) else { return }
         Task.detached {
             let process = Process()
@@ -337,11 +350,15 @@ class SimulatorControl {
                 selectedDeviceUDID = devices.first?.udid ?? ""
             }
             await applyFetchedState()
+            await refreshApps()
         }
     }
 
     func syncSettings() {
-        Task { await applyFetchedState() }
+        Task {
+            await applyFetchedState()
+            await refreshApps()
+        }
     }
 
     func refreshDevices() {
@@ -351,6 +368,19 @@ class SimulatorControl {
             if !devices.contains(where: { $0.udid == selectedDeviceUDID }) {
                 selectedDeviceUDID = devices.first?.udid ?? ""
             }
+        }
+    }
+
+    private func refreshApps() async {
+        let id = deviceId
+        let apps = await Task.detached { Self.fetchUserApps(deviceId: id) }.value
+        userApps = apps
+        // Auto-fill bundle ID if empty and there's a running app
+        if pushBundleID.isEmpty, let running = apps.first(where: { $0.isRunning }) {
+            pushBundleID = running.bundleID
+        }
+        if privacyBundleID.isEmpty, let running = apps.first(where: { $0.isRunning }) {
+            privacyBundleID = running.bundleID
         }
     }
 
@@ -459,6 +489,61 @@ class SimulatorControl {
                 )
             }
         }
+    }
+
+    nonisolated private static func fetchUserApps(deviceId: String) -> [InstalledApp] {
+        // Get installed apps via listapps + plutil conversion to JSON
+        let (listProc, listPipe) = startSimctl(["listapps", deviceId])
+        // Get running apps via launchctl
+        let (runProc, runPipe) = startSimctl(["spawn", deviceId, "launchctl", "list"])
+
+        listProc.waitUntilExit()
+        runProc.waitUntilExit()
+
+        let listOutput = readPipe(listPipe)
+        let runOutput = readPipe(runPipe)
+
+        // Parse running bundle IDs from launchctl
+        var runningBundleIDs = Set<String>()
+        for line in runOutput.components(separatedBy: "\n") {
+            guard let range = line.range(of: "UIKitApplication:") else { continue }
+            let after = line[range.upperBound...]
+            if let bracket = after.firstIndex(of: "[") {
+                runningBundleIDs.insert(String(after[..<bracket]))
+            }
+        }
+
+        // Convert plist to JSON via plutil
+        let plutil = Process()
+        let plutilIn = Pipe()
+        let plutilOut = Pipe()
+        plutil.executableURL = URL(fileURLWithPath: "/usr/bin/plutil")
+        plutil.arguments = ["-convert", "json", "-o", "-", "--", "-"]
+        plutil.standardInput = plutilIn
+        plutil.standardOutput = plutilOut
+        plutil.standardError = FileHandle.nullDevice
+        try? plutil.run()
+        plutilIn.fileHandleForWriting.write(Data(listOutput.utf8))
+        plutilIn.fileHandleForWriting.closeFile()
+        plutil.waitUntilExit()
+
+        let jsonData = plutilOut.fileHandleForReading.readDataToEndOfFile()
+        guard let dict = try? JSONSerialization.jsonObject(with: jsonData) as? [String: [String: Any]] else {
+            return []
+        }
+
+        return dict.compactMap { bundleID, info in
+            guard (info["ApplicationType"] as? String) == "User" else { return nil }
+            let name = (info["CFBundleDisplayName"] as? String)
+                ?? (info["CFBundleName"] as? String)
+                ?? bundleID
+            return InstalledApp(
+                bundleID: bundleID,
+                name: name,
+                isRunning: runningBundleIDs.contains(bundleID)
+            )
+        }
+        .sorted { ($0.isRunning ? 0 : 1, $0.name) < ($1.isRunning ? 0 : 1, $1.name) }
     }
 
     nonisolated private static func formatRuntime(_ identifier: String) -> String {
