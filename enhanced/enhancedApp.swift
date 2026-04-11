@@ -9,9 +9,12 @@ import SwiftUI
 
 @main
 struct enhancedApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
     var body: some Scene {
-        WindowGroup {
-            ContentView()
+        // Menu bar app — no main window
+        Settings {
+            EmptyView()
         }
     }
 }
