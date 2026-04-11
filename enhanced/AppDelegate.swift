@@ -48,7 +48,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupPanel() {
         panel = FloatingPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 260, height: 520)
+            contentRect: NSRect(x: 0, y: 0, width: 260, height: 680)
         )
 
         let contentView = ControlPanelView(

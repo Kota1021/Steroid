@@ -192,6 +192,135 @@ class SimulatorControl {
         isRecording = false
     }
 
+    // MARK: - Status Bar
+
+    var statusBarTime = "9:41"
+    var statusBarNetwork = "wifi"
+    var statusBarWiFiBars = 3
+    var statusBarCellularBars = 4
+    var statusBarOperator = ""
+    var statusBarBatteryState = "charged"
+    var statusBarBatteryLevel: Double = 100
+
+    static let dataNetworkTypes = ["hide", "wifi", "3g", "4g", "lte", "lte-a", "lte+", "5g", "5g+", "5g-uwb", "5g-uc"]
+    static let batteryStates = ["charging", "charged", "discharging"]
+
+    func applyStatusBar() {
+        var args = ["status_bar", deviceId, "override"]
+        args += ["--time", statusBarTime.isEmpty ? "9:41" : statusBarTime]
+        args += ["--dataNetwork", statusBarNetwork]
+        args += ["--wifiBars", String(statusBarWiFiBars)]
+        args += ["--cellularBars", String(statusBarCellularBars)]
+        args += ["--operatorName", statusBarOperator.isEmpty ? "" : statusBarOperator]
+        args += ["--batteryState", statusBarBatteryState]
+        args += ["--batteryLevel", String(Int(statusBarBatteryLevel))]
+        simctl(args)
+    }
+
+    func clearStatusBar() {
+        simctl(["status_bar", deviceId, "clear"])
+    }
+
+    // MARK: - Location
+
+    var locationLat = ""
+    var locationLon = ""
+    var locationScenario = "City Run"
+    var isLocationRunning = false
+
+    static let locationScenarios = ["City Run", "City Bicycle Ride", "Freeway Drive", "Apple"]
+
+    func setLocation() {
+        guard !locationLat.isEmpty, !locationLon.isEmpty else { return }
+        simctl(["location", deviceId, "set", "\(locationLat),\(locationLon)"])
+        isLocationRunning = true
+    }
+
+    func runLocationScenario() {
+        simctl(["location", deviceId, "run", locationScenario])
+        isLocationRunning = true
+    }
+
+    func clearLocation() {
+        simctl(["location", deviceId, "clear"])
+        isLocationRunning = false
+    }
+
+    // MARK: - Push Notification
+
+    var pushBundleID = ""
+    var pushTitle = ""
+    var pushBody = ""
+
+    func sendPush() {
+        guard !pushBundleID.isEmpty else { return }
+        let id = deviceId
+        let bundleId = pushBundleID
+        let json: [String: Any] = [
+            "aps": ["alert": ["title": pushTitle, "body": pushBody]],
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: json) else { return }
+        Task.detached {
+            let process = Process()
+            let inputPipe = Pipe()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+            process.arguments = ["simctl", "push", id, bundleId, "-"]
+            process.standardInput = inputPipe
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
+            try? process.run()
+            inputPipe.fileHandleForWriting.write(data)
+            inputPipe.fileHandleForWriting.closeFile()
+            process.waitUntilExit()
+        }
+    }
+
+    // MARK: - Privacy
+
+    var privacyService = "photos"
+    var privacyBundleID = ""
+
+    static let privacyServices: [(label: String, value: String)] = [
+        ("All", "all"),
+        ("Calendar", "calendar"),
+        ("Contacts", "contacts"),
+        ("Contacts (Limited)", "contacts-limited"),
+        ("Location (In Use)", "location"),
+        ("Location (Always)", "location-always"),
+        ("Photos", "photos"),
+        ("Photos (Add)", "photos-add"),
+        ("Media Library", "media-library"),
+        ("Microphone", "microphone"),
+        ("Motion", "motion"),
+        ("Reminders", "reminders"),
+        ("Siri", "siri"),
+    ]
+
+    func grantPrivacy() {
+        guard !privacyBundleID.isEmpty else { return }
+        simctl(["privacy", deviceId, "grant", privacyService, privacyBundleID])
+    }
+
+    func revokePrivacy() {
+        guard !privacyBundleID.isEmpty else { return }
+        simctl(["privacy", deviceId, "revoke", privacyService, privacyBundleID])
+    }
+
+    func resetPrivacy() {
+        var args = ["privacy", deviceId, "reset", privacyService]
+        if !privacyBundleID.isEmpty { args.append(privacyBundleID) }
+        simctl(args)
+    }
+
+    // MARK: - Open URL
+
+    var openURLString = ""
+
+    func openURL() {
+        guard !openURLString.isEmpty else { return }
+        simctl(["openurl", deviceId, openURLString])
+    }
+
     // MARK: - Sync
 
     func syncWithSimulator() {
