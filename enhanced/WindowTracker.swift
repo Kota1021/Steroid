@@ -3,8 +3,10 @@ import Combine
 
 class WindowTracker: ObservableObject {
     @Published var simulatorFrame: CGRect?
+    @Published var isSimulatorFocused = false
 
     private var timer: Timer?
+    private var activationObserver: Any?
 
     var isSimulatorRunning: Bool {
         simulatorFrame != nil
@@ -15,11 +17,24 @@ class WindowTracker: ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             self?.updateSimulatorFrame()
         }
+
+        activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
+            self?.isSimulatorFocused = app.bundleIdentifier == "com.apple.iphonesimulator"
+        }
     }
 
     func stopTracking() {
         timer?.invalidate()
         timer = nil
+        if let observer = activationObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+            activationObserver = nil
+        }
     }
 
     private func updateSimulatorFrame() {

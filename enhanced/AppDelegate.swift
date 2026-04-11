@@ -92,6 +92,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
             .store(in: &cancellables)
+
+        windowTracker.$isSimulatorFocused
+            .receive(on: RunLoop.main)
+            .sink { [weak self] focused in
+                guard let self, self.isPanelVisible else { return }
+                self.panel.level = focused ? .floating : .normal
+            }
+            .store(in: &cancellables)
     }
 
     private func positionPanel(relativeTo simulatorFrame: CGRect) {
