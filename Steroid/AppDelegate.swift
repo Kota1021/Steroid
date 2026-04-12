@@ -25,7 +25,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if let button = statusItem.button {
             button.image = NSImage(
                 systemSymbolName: "iphone.gen3",
-                accessibilityDescription: "Simulator Enhanced"
+                accessibilityDescription: "Steroid"
             )
         }
 

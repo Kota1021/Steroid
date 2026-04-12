@@ -7,13 +7,13 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		8BE190FA2F8A48CE0098A344 /* enhanced.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = enhanced.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8BE190FA2F8A48CE0098A344 /* Steroid.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Steroid.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		8BE190FC2F8A48CE0098A344 /* enhanced */ = {
+		8BE190FC2F8A48CE0098A344 /* Steroid */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = enhanced;
+			path = Steroid;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -32,7 +32,7 @@
 		8BE190F12F8A48CE0098A344 = {
 			isa = PBXGroup;
 			children = (
-				8BE190FC2F8A48CE0098A344 /* enhanced */,
+				8BE190FC2F8A48CE0098A344 /* Steroid */,
 				8BE190FB2F8A48CE0098A344 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -40,7 +40,7 @@
 		8BE190FB2F8A48CE0098A344 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				8BE190FA2F8A48CE0098A344 /* enhanced.app */,
+				8BE190FA2F8A48CE0098A344 /* Steroid.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -48,9 +48,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		8BE190F92F8A48CE0098A344 /* enhanced */ = {
+		8BE190F92F8A48CE0098A344 /* Steroid */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 8BE191052F8A48CF0098A344 /* Build configuration list for PBXNativeTarget "enhanced" */;
+			buildConfigurationList = 8BE191052F8A48CF0098A344 /* Build configuration list for PBXNativeTarget "Steroid" */;
 			buildPhases = (
 				8BE190F62F8A48CE0098A344 /* Sources */,
 				8BE190F72F8A48CE0098A344 /* Frameworks */,
@@ -61,13 +61,13 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				8BE190FC2F8A48CE0098A344 /* enhanced */,
+				8BE190FC2F8A48CE0098A344 /* Steroid */,
 			);
-			name = enhanced;
+			name = Steroid;
 			packageProductDependencies = (
 			);
-			productName = enhanced;
-			productReference = 8BE190FA2F8A48CE0098A344 /* enhanced.app */;
+			productName = Steroid;
+			productReference = 8BE190FA2F8A48CE0098A344 /* Steroid.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -85,7 +85,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 8BE190F52F8A48CE0098A344 /* Build configuration list for PBXProject "enhanced" */;
+			buildConfigurationList = 8BE190F52F8A48CE0098A344 /* Build configuration list for PBXProject "Steroid" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -99,7 +99,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				8BE190F92F8A48CE0098A344 /* enhanced */,
+				8BE190F92F8A48CE0098A344 /* Steroid */,
 			);
 		};
 /* End PBXProject section */
@@ -312,7 +312,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		8BE190F52F8A48CE0098A344 /* Build configuration list for PBXProject "enhanced" */ = {
+		8BE190F52F8A48CE0098A344 /* Build configuration list for PBXProject "Steroid" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				8BE191032F8A48CF0098A344 /* Debug */,
@@ -321,7 +321,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		8BE191052F8A48CF0098A344 /* Build configuration list for PBXNativeTarget "enhanced" */ = {
+		8BE191052F8A48CF0098A344 /* Build configuration list for PBXNativeTarget "Steroid" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				8BE191062F8A48CF0098A344 /* Debug */,
