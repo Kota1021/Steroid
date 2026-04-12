@@ -5,6 +5,17 @@ A floating control panel for iOS Simulator. Attaches to the Simulator window and
 iOS Simulator用のフローティングコントロールパネル。Simulatorウィンドウに追従し、通常メニューやCLIが必要な設定にすばやくアクセスできます。
 
 iOS Simulator的浮动控制面板。自动吸附在Simulator窗口旁边，快速访问通常需要通过菜单或CLI才能更改的设置。
+<img width="400" alt="image" src="https://github.com/user-attachments/assets/2d581dc7-2265-47c1-ba3d-8c294b48038b" />
+
+|appearnce|push notification|
+|-|-|
+|<video width="400" alt="video" src="https://github.com/user-attachments/assets/d3a91b60-1ec0-4efd-a1b1-4c0c83e9cb40" />|<video width="400" alt="video" src="https://github.com/user-attachments/assets/f56f2677-12b2-407d-9b96-19ef44ec3d01" />|
+
+
+
+
+
+
 
 ## Features
 
