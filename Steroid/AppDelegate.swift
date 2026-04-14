@@ -1,5 +1,6 @@
 import AppKit
 import Observation
+import ServiceManagement
 import SwiftUI
 
 class AppDelegate: NSObject, NSApplicationDelegate {
@@ -36,12 +37,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             keyEquivalent: "t"
         ))
         menu.addItem(.separator())
+
+        let launchItem = NSMenuItem(
+            title: "Launch at Login",
+            action: #selector(toggleLaunchAtLogin),
+            keyEquivalent: ""
+        )
+        launchItem.target = self
+        menu.addItem(launchItem)
+
+        menu.addItem(.separator())
         menu.addItem(NSMenuItem(
             title: "Quit",
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
         ))
         statusItem.menu = menu
+        menu.delegate = self
     }
 
     // MARK: - Panel
@@ -170,6 +182,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             panel.orderFront(nil)
         } else {
             panel.orderOut(nil)
+        }
+    }
+
+    // MARK: - Launch at Login
+
+    @objc private func toggleLaunchAtLogin() {
+        do {
+            if SMAppService.mainApp.status == .enabled {
+                try SMAppService.mainApp.unregister()
+            } else {
+                try SMAppService.mainApp.register()
+            }
+        } catch {
+            NSLog("Failed to toggle launch at login: \(error)")
+        }
+    }
+}
+
+extension AppDelegate: NSMenuDelegate {
+    func menuWillOpen(_ menu: NSMenu) {
+        if let item = menu.items.first(where: { $0.action == #selector(toggleLaunchAtLogin) }) {
+            item.state = SMAppService.mainApp.status == .enabled ? .on : .off
         }
     }
 }
